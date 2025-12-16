@@ -19,68 +19,83 @@
         <div class="main-content">
             <!-- 连接面板 -->
             <section class="card">
-                <h2>串口连接</h2>
+                <div class="card-header">
+                    <h2>串口连接</h2>
+                    <div class="card-actions">
+                        <button onclick="app.refreshPorts()">🔄 刷新</button>
+                    </div>
+                </div>
                 <div class="form-group">
                     <label>选择串口:</label>
                     <select id="portSelect">
                         <option value="">-- 选择串口 --</option>
                     </select>
-                    <button onclick="app.refreshPorts()">🔄 刷新</button>
-                </div>
-                <div class="button-group">
-                    <button class="btn-primary" onclick="app.connect()">连接</button>
-                    <button class="btn-secondary" onclick="app.disconnect()">断开</button>
                 </div>
             </section>
 
             <!-- Modem 信息 -->
             <section class="card">
-                <h2>Modem 信息</h2>
-                <button onclick="app.getModemInfo()">获取信息</button>
-                <button onclick="app. getSignalStrength()">信号强度</button>
+                <div class="card-header">
+                    <h2>Modem 信息</h2>
+                    <div class="card-actions">
+                        <button onclick="app.getModemInfo()">获取信息</button>
+                        <button onclick="app.getSignalStrength()">信号强度</button>
+                    </div>
+                </div>
                 <div id="modemInfo" class="info-display"></div>
+            </section>
+
+            <!-- 接收短信 -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>接收短信</h2>
+                    <div class="card-actions">
+                        <button onclick="app.listSMS()">刷新短信列表</button>
+                    </div>
+                </div>
+                <div id="smsList" class="sms-list"></div>
+            </section>
+
+            <!-- 发送短信 -->
+            <section class="card">
+                <div class="card-header">
+                    <h2>发送短信</h2>
+                    <div class="card-actions">
+                        <button class="btn-primary" onclick="app.sendSMS()">发送短信</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>收件人号码:</label>
+                    <input type="text" id="smsNumber" placeholder="+86XXXXXXXXXXX" />
+                </div>
+                <div class="form-group">
+                    <label>短信内容:</label>
+                    <textarea id="smsMessage" rows="4" placeholder="输入短信内容... "></textarea>
+                </div>
             </section>
 
             <!-- AT 命令 -->
             <section class="card">
-                <h2>AT 命令终端</h2>
+                <div class="card-header">
+                    <h2>AT 命令终端</h2>
+                    <div class="card-actions">
+                        <button onclick="app.sendATCommand()">发送</button>
+                    </div>
+                </div>
                 <div class="form-group">
                     <input type="text" id="atCommand" placeholder="输入 AT 命令 (例如:  AT+CGMI)" />
-                    <button onclick="app.sendATCommand()">发送</button>
                 </div>
                 <div class="terminal" id="terminal"></div>
             </section>
-
-            <!-- 短信管理 -->
-            <section class="card">
-                <h2>短信管理</h2>
-                <div class="tabs">
-                    <button class="tab active" onclick="app.switchTab('receive', this)">接收短信</button>
-                    <button class="tab" onclick="app.switchTab('send', this)">发送短信</button>
-                </div>
-
-                <div id="receiveTab" class="tab-content active">
-                    <button onclick="app.listSMS()">刷新短信列表</button>
-                    <div id="smsList" class="sms-list"></div>
-                </div>
-
-                <div id="sendTab" class="tab-content">
-                    <div class="form-group">
-                        <label>收件人号码:</label>
-                        <input type="text" id="smsNumber" placeholder="+86XXXXXXXXXXX" />
-                    </div>
-                    <div class="form-group">
-                        <label>短信内容:</label>
-                        <textarea id="smsMessage" rows="4" placeholder="输入短信内容... "></textarea>
-                    </div>
-                    <button class="btn-primary" onclick="app.sendSMS()">发送短信</button>
-                </div>
-            </section>
-
+    
             <!-- 实时日志 -->
             <section class="card">
-                <h2>实时日志</h2>
-                <button onclick="app.clearLog()">清空日志</button>
+                <div class="card-header">
+                    <h2>实时日志</h2>
+                    <div class="card-actions">
+                        <button onclick="app.clearLog()">清空日志</button>
+                    </div>
+                </div>
                 <div class="log" id="log"></div>
             </section>
         </div>

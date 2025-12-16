@@ -36,11 +36,6 @@ type SendSMSRequest struct {
 	Port    string `json:"port,omitempty"`
 	Number  string `json:"number"`
 	Message string `json:"message"`
-	UsePDU  bool   `json:"usePDU"` // 是否使用 PDU 模式
-}
-
-type ConnectRequest struct {
-	Port     string `json:"port"`
 }
 
 type SerialPort struct {

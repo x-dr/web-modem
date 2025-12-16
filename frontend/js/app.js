@@ -12,103 +12,8 @@ class ModemManager {
         this.setupSMSCounter();
     }
 
-    // ---------- UI helpers ----------
-    getSelectedPort() {
-        const port = document.getElementById('portSelect').value;
-        if (!port) {
-            this.showError('请选择可用串口');
-            return null;
-        }
-        return port;
-    }
-
-    updateConnectionStatus(connected, portLabel = '') {
-        const statusElement = document.getElementById('connectionStatus');
-        const statusText = document.getElementById('statusText');
-        if (connected) {
-            statusElement.classList.add('connected');
-            statusText.textContent = portLabel ? `已选择 ${portLabel}` : '已连接';
-        } else {
-            statusElement.classList.remove('connected');
-            statusText.textContent = '未连接';
-        }
-    }
-
-    addToTerminal(text) {
-        const terminal = document.getElementById('terminal');
-        terminal.innerHTML += this.escapeHtml(text) + '\n';
-        terminal.scrollTop = terminal.scrollHeight;
-    }
-
-    addLog(text) {
-        const log = document.getElementById('log');
-        const timestamp = new Date().toLocaleTimeString();
-        log.innerHTML += `[${timestamp}] ${this.escapeHtml(text)}\n`;
-        log.scrollTop = log.scrollHeight;
-    }
-
-    clearLog() {
-        document.getElementById('log').innerHTML = '';
-    }
-
-    showError(message) {
-        this.addLog('❌ 错误: ' + message);
-        alert('错误: ' + message);
-    }
-
-    showSuccess(message) {
-        this.addLog('✅ 成功: ' + message);
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    switchTab(tabName, el) {
-        document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-        if (el) el.classList.add('active');
-        document.getElementById(`${tabName}Tab`).classList.add('active');
-    }
-
-    // ---------- SMS counter ----------
-    setupSMSCounter() {
-        const textarea = document.getElementById('smsMessage');
-        if (!textarea) return;
-        const existing = document.getElementById('smsCounter');
-        if (!existing) {
-            const counter = document.createElement('div');
-            counter.id = 'smsCounter';
-            counter.style.cssText = 'margin-top: 5px; color: #666; font-size: 12px;';
-            textarea.parentNode.appendChild(counter);
-        }
-        textarea.addEventListener('input', () => this.updateSMSCounter());
-        this.updateSMSCounter();
-    }
-
-    updateSMSCounter() {
-        const textarea = document.getElementById('smsMessage');
-        const counter = document.getElementById('smsCounter');
-        if (!textarea || !counter) return;
-        const message = textarea.value;
-        const hasUnicode = /[^\x00-\x7F]/.test(message);
-        const maxChars = hasUnicode ? (message.length <= 70 ? 70 : 67) : (message.length <= 160 ? 160 : 153);
-        const parts = Math.ceil(message.length / maxChars) || 1;
-        const encoding = hasUnicode ? 'UCS2 (中文)' : 'GSM 7-bit';
-        counter.innerHTML = `<span>字符数: ${message.length} / ${maxChars}</span> | <span>短信条数: ${parts}</span> | <span>编码: ${encoding}</span>`;
-        if (parts > 3) {
-            counter.style.color = '#ff4444';
-            counter.innerHTML += ` <strong>⚠️ 消息过长，将分为 ${parts} 条发送</strong>`;
-        } else if (parts > 1) {
-            counter.style.color = '#ff9800';
-        } else {
-            counter.style.color = '#666';
-        }
-    }
-
     // ---------- WebSocket ----------
+
     setupWebSocket() {
         this.ws = new WebSocket(this.wsUrl);
         this.ws.onopen = () => this.addLog('WebSocket 连接已建立');
@@ -121,6 +26,7 @@ class ModemManager {
     }
 
     // ---------- API ----------
+
     async apiRequest(endpoint, method = 'GET', body = null) {
         const options = { method, headers: { 'Content-Type': 'application/json' } };
         if (body) options.body = JSON.stringify(body);
@@ -135,6 +41,7 @@ class ModemManager {
     }
 
     // ---------- Port & actions ----------
+
     async refreshPorts() {
         try {
             const ports = await this.apiRequest('/modems');
@@ -155,23 +62,17 @@ class ModemManager {
                 if (connected) select.value = connected.path;
             }
             this.addLog('已刷新串口列表');
+            const selectedPath = select.value;
+            const selectedPort = ports.find(p => p.path === selectedPath && p.connected);
+            this.updateConnectionStatus(!!selectedPort, selectedPort ? selectedPort.path : '');
+            select.onchange = () => {
+                const val = select.value;
+                const item = ports.find(p => p.path === val && p.connected);
+                this.updateConnectionStatus(!!item, item ? item.path : '');
+            };
         } catch (error) {
             console.error('刷新串口失败:', error);
         }
-    }
-
-    async connect() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-        // 前端本地选择端口，不再调用后端
-        this.updateConnectionStatus(true, port);
-        this.addLog(`已选择端口 ${port}`);
-    }
-
-    async disconnect() {
-        // 仅清除本地状态，不请求后端
-        this.updateConnectionStatus(false);
-        this.addLog('已清除前端连接状态');
     }
 
     async sendATCommand() {
@@ -238,7 +139,7 @@ class ModemManager {
         }
         try {
             this.addLog('正在发送短信（支持中文和长短信）...');
-            await this.apiRequest('/modem/sms/send', 'POST', { port, number, message, usePDU: true });
+            await this.apiRequest('/modem/sms/send', 'POST', { port, number, message });
             this.showSuccess('短信发送成功！');
             document.getElementById('smsNumber').value = '';
             document.getElementById('smsMessage').value = '';
@@ -248,7 +149,99 @@ class ModemManager {
         }
     }
 
+    // ---------- SMS counter ----------
+
+    setupSMSCounter() {
+        const textarea = document.getElementById('smsMessage');
+        if (!textarea) return;
+        const existing = document.getElementById('smsCounter');
+        if (!existing) {
+            const counter = document.createElement('div');
+            counter.id = 'smsCounter';
+            counter.style.cssText = 'margin-top: 5px; color: #666; font-size: 12px;';
+            textarea.parentNode.appendChild(counter);
+        }
+        textarea.addEventListener('input', () => this.updateSMSCounter());
+        this.updateSMSCounter();
+    }
+
+    updateSMSCounter() {
+        const textarea = document.getElementById('smsMessage');
+        const counter = document.getElementById('smsCounter');
+        if (!textarea || !counter) return;
+        const message = textarea.value;
+        const hasUnicode = /[^\x00-\x7F]/.test(message);
+        const maxChars = hasUnicode ? (message.length <= 70 ? 70 : 67) : (message.length <= 160 ? 160 : 153);
+        const parts = Math.ceil(message.length / maxChars) || 1;
+        const encoding = hasUnicode ? 'UCS2 (中文)' : 'GSM 7-bit';
+        counter.innerHTML = `<span>字符数: ${message.length} / ${maxChars}</span> | <span>短信条数: ${parts}</span> | <span>编码: ${encoding}</span>`;
+        if (parts > 3) {
+            counter.style.color = '#ff4444';
+            counter.innerHTML += ` <strong>⚠️ 消息过长，将分为 ${parts} 条发送</strong>`;
+        } else if (parts > 1) {
+            counter.style.color = '#ff9800';
+        } else {
+            counter.style.color = '#666';
+        }
+    }
+
+    // ---------- UI helpers ----------
+
+    getSelectedPort() {
+        const port = document.getElementById('portSelect').value;
+        if (!port) {
+            this.showError('请选择可用串口');
+            return null;
+        }
+        return port;
+    }
+
+    updateConnectionStatus(connected, portLabel = '') {
+        const statusElement = document.getElementById('connectionStatus');
+        const statusText = document.getElementById('statusText');
+        if (connected) {
+            statusElement.classList.add('connected');
+            statusText.textContent = portLabel ? `已选择 ${portLabel}` : '已连接';
+        } else {
+            statusElement.classList.remove('connected');
+            statusText.textContent = '未连接';
+        }
+    }
+
+    addToTerminal(text) {
+        const terminal = document.getElementById('terminal');
+        terminal.innerHTML += this.escapeHtml(text) + '\n';
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    addLog(text) {
+        const log = document.getElementById('log');
+        const timestamp = new Date().toLocaleTimeString();
+        log.innerHTML += `[${timestamp}] ${this.escapeHtml(text)}\n`;
+        log.scrollTop = log.scrollHeight;
+    }
+
+    clearLog() {
+        document.getElementById('log').innerHTML = '';
+    }
+
+    showError(message) {
+        this.addLog('❌ 错误: ' + message);
+        alert('错误: ' + message);
+    }
+
+    showSuccess(message) {
+        this.addLog('✅ 成功: ' + message);
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     // ---------- Render ----------
+
     displayModemInfo(info) {
         const container = document.getElementById('modemInfo');
         container.innerHTML = `
@@ -289,7 +282,6 @@ class ModemManager {
 }
 
 const app = new ModemManager();
-
 document.getElementById('atCommand')?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
         app.sendATCommand();
