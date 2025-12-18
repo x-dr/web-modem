@@ -13,12 +13,13 @@ var (
 	managerInstance *SerialManager
 )
 
+// SerialManager manages multiple serial connections.
 type SerialManager struct {
 	pool map[string]*SerialService
-	mu       sync.Mutex
+	mu   sync.Mutex
 }
 
-// GetSerialManager 返回全局串口管理器。
+// GetSerialManager returns the singleton instance of SerialManager.
 func GetSerialManager() *SerialManager {
 	managerOnce.Do(func() {
 		managerInstance = &SerialManager{
@@ -28,33 +29,40 @@ func GetSerialManager() *SerialManager {
 	return managerInstance
 }
 
-// Scan 扫描并连接支持 AT 的 modem，返回已连接端口列表。
+// Scan scans for available modems and connects to them.
+// It looks for devices matching /dev/ttyUSB* and /dev/ttyACM*.
 func (m *SerialManager) Scan(baudRate int) ([]models.SerialPort, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	usbPorts, _ := filepath.Glob("/dev/ttyUSB*")
-	acmPorts, _ := filepath.Glob("/dev/ttyACM*")
-	candidates := append(usbPorts, acmPorts...)
-
+	// Find potential devices
+	usb, _ := filepath.Glob("/dev/ttyUSB*")
+	acm, _ := filepath.Glob("/dev/ttyACM*")
+	candidates := append(usb, acm...)
+	
+	// Try to connect to new devices
 	for _, p := range candidates {
-		if _, ok := m.pool[p]; ok {
-			continue // 已连接
-		}
-		if svc, err := NewSerialService(p, baudRate); err == nil {
-			m.pool[p] = svc
-			svc.Start()
+		if _, exists := m.pool[p]; !exists {
+			if svc, err := NewSerialService(p, baudRate); err == nil {
+				m.pool[p] = svc
+				svc.Start()
+			}
 		}
 	}
 
+	// Build result list from active connections
 	var result []models.SerialPort
 	for name := range m.pool {
-		result = append(result, models.SerialPort{Name: name, Path: name, Connected: true})
+		result = append(result, models.SerialPort{
+			Name:      name,
+			Path:      name,
+			Connected: true,
+		})
 	}
 	return result, nil
 }
 
-// GetService 根据端口名返回对应的 SerialService。
+// GetService returns the SerialService for a given port name.
 func (m *SerialManager) GetService(name string) (*SerialService, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

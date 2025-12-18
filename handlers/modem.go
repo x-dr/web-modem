@@ -10,19 +10,16 @@ import (
 
 var serialManager = services.GetSerialManager()
 
-// 列出可用串口
+// ListModems returns a list of available modems
 func ListModems(w http.ResponseWriter, r *http.Request) {
-	// 扫描并一次性连接可用串口
-	ports, err := serialManager.Scan(115200)
-	if err != nil {
+	if ports, err := serialManager.Scan(115200); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error())
-		return
+	} else {
+		respondJSON(w, http.StatusOK, ports)
 	}
-
-	respondJSON(w, http.StatusOK, ports)
 }
 
-// 发送 AT 命令
+// SendATCommand sends a raw AT command to the modem
 func SendATCommand(w http.ResponseWriter, r *http.Request) {
 	var cmd models.ATCommand
 	if err := json.NewDecoder(r.Body).Decode(&cmd); err != nil {
@@ -30,69 +27,49 @@ func SendATCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, ok := getServiceFromPortParam(w, cmd.Port)
-	if !ok {
-		return
+	if svc := getService(w, cmd.Port); svc != nil {
+		var err error
+		if cmd.Response, err = svc.SendATCommand(cmd.Command); err != nil {
+			cmd.Error = err.Error()
+		}
+		respondJSON(w, http.StatusOK, cmd)
 	}
-
-	response, err := svc.SendATCommand(cmd.Command)
-	if err != nil {
-		cmd.Error = err.Error()
-	}
-	cmd.Response = response
-
-	respondJSON(w, http.StatusOK, cmd)
 }
 
-// 获取 Modem 信息
+// GetModemInfo retrieves detailed information about the modem
 func GetModemInfo(w http.ResponseWriter, r *http.Request) {
-	svc, ok := requireQueryService(w, r)
-	if !ok {
-		return
+	if svc := getService(w, r.URL.Query().Get("port")); svc != nil {
+		if info, err := svc.GetModemInfo(); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+		} else {
+			respondJSON(w, http.StatusOK, info)
+		}
 	}
-
-	info, err := svc.GetModemInfo()
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, info)
 }
 
-// 获取信号强度
+// GetSignalStrength retrieves the current signal strength
 func GetSignalStrength(w http.ResponseWriter, r *http.Request) {
-	svc, ok := requireQueryService(w, r)
-	if !ok {
-		return
+	if svc := getService(w, r.URL.Query().Get("port")); svc != nil {
+		if signal, err := svc.GetSignalStrength(); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+		} else {
+			respondJSON(w, http.StatusOK, signal)
+		}
 	}
-
-	signal, err := svc.GetSignalStrength()
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, signal)
 }
 
-// 列出短信
+// ListSMS retrieves all SMS messages from the modem
 func ListSMS(w http.ResponseWriter, r *http.Request) {
-	svc, ok := requireQueryService(w, r)
-	if !ok {
-		return
+	if svc := getService(w, r.URL.Query().Get("port")); svc != nil {
+		if list, err := svc.ListSMS(); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+		} else {
+			respondJSON(w, http.StatusOK, list)
+		}
 	}
-
-	smsList, err := svc.ListSMS()
-	if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, smsList)
 }
 
-// 发送短信
+// SendSMS sends an SMS message
 func SendSMS(w http.ResponseWriter, r *http.Request) {
 	var req models.SendSMSRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -100,46 +77,36 @@ func SendSMS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svc, ok := getServiceFromPortParam(w, req.Port)
-	if !ok {
-		return
+	if svc := getService(w, req.Port); svc != nil {
+		if err := svc.SendSMS(req.Number, req.Message); err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error())
+		} else {
+			respondJSON(w, http.StatusOK, map[string]string{"status": "sent"})
+		}
 	}
-
-	if err := svc.SendSMS(req.Number, req.Message); err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	respondJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 }
 
-// 辅助函数：返回 JSON
+// Helper functions
+
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
-// 辅助函数：返回错误
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
+func respondError(w http.ResponseWriter, status int, msg string) {
+	respondJSON(w, status, map[string]string{"error": msg})
 }
 
-func requireQueryService(w http.ResponseWriter, r *http.Request) (*services.SerialService, bool) {
-	return getServiceFromPortParam(w, r.URL.Query().Get("port"))
-}
-
-func getServiceFromPortParam(w http.ResponseWriter, port string) (*services.SerialService, bool) {
+func getService(w http.ResponseWriter, port string) *services.SerialService {
 	if port == "" {
 		respondError(w, http.StatusBadRequest, "port is required")
-		return nil, false
+		return nil
 	}
-
 	svc, err := serialManager.GetService(port)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, err.Error())
-		return nil, false
+		return nil
 	}
-
-	return svc, true
+	return svc
 }

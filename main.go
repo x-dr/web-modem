@@ -1,41 +1,46 @@
 package main
 
 import (
-	"log"
-	"net/http"
-	"os"
+    "log"
+    "net/http"
+    "os"
 
-	"github.com/gorilla/mux"
-	"github.com/rs/cors"
+    "github.com/gorilla/mux"
+    "github.com/rs/cors"
 
-	"modem-manager/handlers"
+    "modem-manager/handlers"
+)
+
+const (
+    defaultPort = "8080"
+    apiPrefix   = "/api/v1"
 )
 
 func main() {
-	router := mux.NewRouter()
+    // Initialize router
+    r := mux.NewRouter()
+    api := r.PathPrefix(apiPrefix).Subrouter()
 
-	// API 路由
-	api := router.PathPrefix("/api/v1").Subrouter()
-	api.HandleFunc("/modems", handlers.ListModems).Methods("GET")
-	api.HandleFunc("/modem/send", handlers.SendATCommand).Methods("POST")
-	api.HandleFunc("/modem/info", handlers.GetModemInfo).Methods("GET")
-	api.HandleFunc("/modem/signal", handlers.GetSignalStrength).Methods("GET")
-	api.HandleFunc("/modem/sms/list", handlers.ListSMS).Methods("GET")
-	api.HandleFunc("/modem/sms/send", handlers.SendSMS).Methods("POST")
+    // Modem routes
+    api.HandleFunc("/modems", handlers.ListModems).Methods("GET")
+    api.HandleFunc("/modem/send", handlers.SendATCommand).Methods("POST")
+    api.HandleFunc("/modem/info", handlers.GetModemInfo).Methods("GET")
+    api.HandleFunc("/modem/signal", handlers.GetSignalStrength).Methods("GET")
+    
+    // SMS routes
+    api.HandleFunc("/modem/sms/list", handlers.ListSMS).Methods("GET")
+    api.HandleFunc("/modem/sms/send", handlers.SendSMS).Methods("POST")
 
-	// WebSocket 路由
-	router.HandleFunc("/ws", handlers.HandleWebSocket)
+    // WebSocket and Static files
+    r.HandleFunc("/ws", handlers.HandleWebSocket)
+    r.PathPrefix("/").Handler(http.FileServer(http.Dir("frontend")))
 
-	// 静态文件服务
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("frontend")))
+    // Start server
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = defaultPort
+    }
 
-	handler := cors.AllowAll().Handler(router)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	log.Println("Server starting on :" + port)
-	log.Fatal(http.ListenAndServe(":"+port, handler))
+    log.Printf("Server starting on :%s", port)
+    log.Fatal(http.ListenAndServe(":"+port, cors.AllowAll().Handler(r)))
 }

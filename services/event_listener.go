@@ -7,62 +7,53 @@ var (
 	listenerInstance *EventListener
 )
 
+// EventListener manages event subscriptions and broadcasting.
 type EventListener struct {
 	pool map[chan string]struct{}
-	mu        sync.RWMutex
+	sync.RWMutex
 }
 
-// GetEventListener 返回全局监听管理器。
+// GetEventListener returns the singleton instance of EventListener.
 func GetEventListener() *EventListener {
 	listenerOnce.Do(func() {
-		listenerInstance = &EventListener{
-			pool: make(map[chan string]struct{}),
-		}
+		listenerInstance = &EventListener{pool: make(map[chan string]struct{})}
 	})
 	return listenerInstance
 }
 
-// Broadcast 向所有监听器发送消息（非阻塞，包内使用）。
-func (el *EventListener) Broadcast(message string) {
-	el.mu.RLock()
-	snapshot := make([]chan string, 0, len(el.pool))
-	for ch := range el.pool {
-		snapshot = append(snapshot, ch)
-	}
-	el.mu.RUnlock()
+// Broadcast sends a message to all subscribers non-blocking.
+// If a subscriber's channel is full, the message is skipped for that subscriber.
+func (el *EventListener) Broadcast(msg string) {
+	el.RLock()
+	defer el.RUnlock()
 
-	for _, listener := range snapshot {
+	for ch := range el.pool {
 		select {
-		case listener <- message:
+		case ch <- msg:
 		default:
+			// Channel full, skip message
 		}
 	}
 }
 
-// Subscribe 便捷订阅：返回通道与取消函数。
+// Subscribe creates a new subscription channel.
+// Returns the channel to receive messages and a cancel function to unsubscribe.
 func (el *EventListener) Subscribe(buffer int) (chan string, func()) {
 	if buffer <= 0 {
 		buffer = 100
 	}
 	ch := make(chan string, buffer)
-	el.addListener(ch)
-	cancel := func() { el.removeListener(ch) }
-	return ch, cancel
-}
 
-// addListener 注册一个新的监听通道（包内使用）。
-func (el *EventListener) addListener(ch chan string) {
-	el.mu.Lock()
+	el.Lock()
 	el.pool[ch] = struct{}{}
-	el.mu.Unlock()
-}
+	el.Unlock()
 
-// removeListener 注销监听通道并关闭它（包内使用）。
-func (el *EventListener) removeListener(ch chan string) {
-	el.mu.Lock()
-	if _, ok := el.pool[ch]; ok {
-		delete(el.pool, ch)
-		close(ch)
+	return ch, func() {
+		el.Lock()
+		defer el.Unlock()
+		if _, ok := el.pool[ch]; ok {
+			delete(el.pool, ch)
+			close(ch)
+		}
 	}
-	el.mu.Unlock()
 }

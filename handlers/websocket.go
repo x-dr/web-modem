@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -9,27 +8,25 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
+// HandleWebSocket upgrades the HTTP connection to a WebSocket connection
+// and streams serial events to the client.
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("WebSocket upgrade error:", err)
 		return
 	}
 	defer conn.Close()
 
-	// 创建监听通道
+	// Subscribe to event listener
 	ch, cancel := services.GetEventListener().Subscribe(100)
 	defer cancel()
 
-	for message := range ch {
-		err := conn.WriteMessage(websocket.TextMessage, []byte(message))
-		if err != nil {
-			log.Println("WebSocket write error:", err)
+	// Stream messages
+	for msg := range ch {
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 			return
 		}
 	}
