@@ -7,6 +7,7 @@ class ModemManager {
         this.ws = null;
         this.isBusy = false;
         this.templates = {};
+        this.port = null;
         this.init();
     }
 
@@ -85,22 +86,22 @@ class ModemManager {
     }
 
     async loadPortRelatedInfo() {
-        const port = this.getSelectedPort();
-        if (!port) return;
+        this.port = $('#portSelect').value;
+        if (!this.port) {
+            this.logger('请选择可用串口', 'error');
+            return null;
+        }
 
         try {
-            await this.getSignalStrength(port);
-            await this.getModemInfo(port);
-            await this.listSMS(port);
+            await this.getSignalStrength();
+            await this.getModemInfo();
+            await this.listSMS();
         } catch (error) {
             this.logger('串口相关信息加载失败', 'error');
         }
     }
 
     async sendATCommand() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-
         const command = $('#atCommand').value.trim();
         if (!command) {
             this.logger('请输入 AT 命令', 'error');
@@ -108,7 +109,7 @@ class ModemManager {
         }
 
         try {
-            const result = await this.apiRequest('/modem/at', 'POST', { port, command });
+            const result = await this.apiRequest('/modem/at', 'POST', { port: this.port, command });
             this.addToTerminal(`> ${command}`);
             this.addToTerminal(result.response || '');
             $('#atCommand').value = '';
@@ -117,27 +118,24 @@ class ModemManager {
         }
     }
 
-    async getModemInfo(port) {
-        const info = await this.apiRequest(`/modem/info?port=${encodeURIComponent(port)}`);
+    async getModemInfo() {
+        const info = await this.apiRequest(`/modem/info?port=${encodeURIComponent(this.port)}`);
         this.displayModemInfo(info);
     }
 
-    async getSignalStrength(port) {
-        const signal = await this.apiRequest(`/modem/signal?port=${encodeURIComponent(port)}`);
+    async getSignalStrength() {
+        const signal = await this.apiRequest(`/modem/signal?port=${encodeURIComponent(this.port)}`);
         this.displaySignalInfo(signal);
     }
 
-    async listSMS(port) {
+    async listSMS() {
         this.logger('正在读取短信列表 ...');
-        const smsList = await this.apiRequest(`/modem/sms/list?port=${encodeURIComponent(port)}`);
+        const smsList = await this.apiRequest(`/modem/sms/list?port=${encodeURIComponent(this.port)}`);
         this.displaySMSList(smsList);
         this.logger(`已读取 ${smsList.length} 条短信`);
     }
 
     async sendSMS() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-
         const number = $('#smsNumber').value.trim();
         const message = $('#smsMessage').value.trim();
         if (!number || !message) {
@@ -147,7 +145,7 @@ class ModemManager {
 
         try {
             this.logger('正在发送短信 ...');
-            await this.apiRequest('/modem/sms/send', 'POST', { port, number, message });
+            await this.apiRequest('/modem/sms/send', 'POST', { port: this.port, number, message });
             this.logger('短信发送成功！', 'success');
             $('#smsNumber').value = '';
             $('#smsMessage').value = '';
@@ -158,14 +156,13 @@ class ModemManager {
     }
 
     async deleteSMS(index) {
-        if (!confirm('确定要删除这条短信吗？')) return;
-
-        const port = this.getSelectedPort();
-        if (!port) return;
+        if (!confirm('确定要删除这条短信吗？')) {
+            return;
+        }
 
         try {
             this.logger(`正在删除短信 (Index: ${index})...`);
-            await this.apiRequest('/modem/sms/delete', 'POST', { port, index });
+            await this.apiRequest('/modem/sms/delete', 'POST', { port: this.port, index });
             this.logger('短信删除成功！', 'success');
             this.listSMS(); // 刷新列表
         } catch (error) {
@@ -222,15 +219,6 @@ class ModemManager {
         $$('button').forEach(btn => btn.disabled = disabled);
         $$('select').forEach(btn => btn.disabled = disabled);
         $('#refreshBtn').innerText = disabled ? '加载中...' : '刷新';
-    }
-
-    getSelectedPort() {
-        const port = $('#portSelect').value;
-        if (!port) {
-            this.logger('请选择可用串口', 'error');
-            return null;
-        }
-        return port;
     }
 
     addToTerminal(text) {
