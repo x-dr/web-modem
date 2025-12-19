@@ -1,6 +1,7 @@
 package modem
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -12,42 +13,15 @@ import (
 	"time"
 
 	"github.com/tarm/serial"
+	"github.com/xlab/at/pdu"
+	"github.com/xlab/at/sms"
 )
 
 const (
-	// AT 命令
-	cmdCheck        = "AT"
-	cmdEchoOff      = "ATE0"
-	cmdNumber       = "AT+CNUM"
-	cmdManufacturer = "AT+CGMI"
-	cmdModel        = "AT+CGMM"
-	cmdIMEI         = "AT+CGSN"
-	cmdIMSI         = "AT+CIMI"
-	cmdSignal       = "AT+CSQ"
-	cmdOperator     = "AT+COPS?"
-	cmdPDUMode      = "AT+CMGF=0"
-	cmdListSMS      = "AT+CMGL=4"
-	cmdDeleteSMS    = "AT+CMGD=%d"
-	cmdSendSMS      = "AT+CMGS=%d"
-
-	// 特殊字符
-	eof   = "\r\n"
-	ctrlZ = "\x1A"
-
-	// 常用响应
-	respOK    = "OK"
-	respError = "ERROR"
-
-	// 延迟和超时
-	bufferSize  = 128
-	readTimeout = 100 * time.Millisecond
+	bufferSize  = 256
 	errorSleep  = 100 * time.Millisecond
-)
-
-var (
-	// 正则表达式
-	rePhoneNumber = regexp.MustCompile(`\+CNUM:.*,"([^"]+)"`)
-	reOperator    = regexp.MustCompile(`"([^"]+)"`)
+	readTimeout = 100 * time.Millisecond
+	atTimeout   = 1 * time.Second
 )
 
 // SerialService 封装了单个串口的读取、写入和监控。
@@ -77,11 +51,11 @@ func NewSerialService(name string, baudRate int, broadcast func(string)) (*Seria
 
 // check 发送基本的 AT 命令以验证连接。
 func (s *SerialService) check() error {
-	resp, err := s.SendATCommand(cmdCheck)
+	resp, err := s.SendATCommand("AT")
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(resp, respOK) {
+	if !strings.Contains(resp, "OK") {
 		return fmt.Errorf("command AT failed: %s", resp)
 	}
 	return nil
@@ -89,8 +63,8 @@ func (s *SerialService) check() error {
 
 // Start 开始串口服务读取循环。
 func (s *SerialService) Start() {
-	s.SendATCommand(cmdEchoOff) // 关闭回显
-	s.SendATCommand(cmdPDUMode) // 短信格式
+	s.SendATCommand("ATE0")      // 关闭回显
+	s.SendATCommand("AT+CMGF=0") // 短信格式
 	go s.readLoop()
 }
 
@@ -114,7 +88,7 @@ func (s *SerialService) readLoop() {
 
 // SendATCommand 发送 AT 命令并读取响应。
 func (s *SerialService) SendATCommand(command string) (string, error) {
-	return s.sendRawCommand(command, eof, 1*time.Second)
+	return s.sendRawCommand(command, "\r\n", atTimeout)
 }
 
 // sendRawCommand 发送原始命令并读取响应。
@@ -140,7 +114,7 @@ func (s *SerialService) sendRawCommand(command, suffix string, timeout time.Dura
 		if n > 0 {
 			resp.Write(buf[:n])
 			str := resp.String()
-			if strings.Contains(str, respOK) || strings.Contains(str, respError) || strings.Contains(str, ">") {
+			if strings.Contains(str, "OK") || strings.Contains(str, "ERROR") || strings.Contains(str, ">") {
 				return strings.TrimSpace(str), nil
 			}
 		}
@@ -150,33 +124,21 @@ func (s *SerialService) sendRawCommand(command, suffix string, timeout time.Dura
 				continue
 			}
 			if resp.Len() > 0 {
-				return resp.String(), nil
+				return strings.TrimSpace(resp.String()), nil
 			}
 			return "", err
 		}
 	}
 }
 
-// GetPhoneNumber 查询电话号码。
-func (s *SerialService) GetPhoneNumber() (string, error) {
-	resp, err := s.SendATCommand(cmdNumber)
-	if err != nil {
-		return "", err
-	}
-	if m := rePhoneNumber.FindStringSubmatch(resp); len(m) > 1 {
-		return DecodeUCS2Hex(m[1]), nil
-	}
-	return "", errors.New("not found")
-}
-
 // GetModemInfo 获取有关当前端口的基本信息。
 func (s *SerialService) GetModemInfo() (*ModemInfo, error) {
 	info := &ModemInfo{Port: s.name, Connected: true}
 	cmds := map[*string]string{
-		&info.Manufacturer: cmdManufacturer,
-		&info.Model:        cmdModel,
-		&info.IMEI:         cmdIMEI,
-		&info.IMSI:         cmdIMSI,
+		&info.Manufacturer: "AT+CGMI",
+		&info.Model:        "AT+CGMM",
+		&info.IMEI:         "AT+CGSN",
+		&info.IMSI:         "AT+CIMI",
 	}
 
 	for ptr, cmd := range cmds {
@@ -185,38 +147,64 @@ func (s *SerialService) GetModemInfo() (*ModemInfo, error) {
 		}
 	}
 
-	if resp, err := s.SendATCommand(cmdOperator); err == nil {
-		if m := reOperator.FindStringSubmatch(resp); len(m) > 1 {
-			info.Operator = m[1]
-		}
-	}
-
+	info.Operator, _ = s.getOperator()
 	info.PhoneNumber, _ = s.GetPhoneNumber()
 	return info, nil
 }
 
+// getOperator 查询当前运营商名称。
+func (s *SerialService) getOperator() (string, error) {
+	resp, err := s.SendATCommand("AT+COPS?")
+	if err != nil {
+		return "", err
+	}
+
+	if m := regexp.MustCompile(`"([^"]+)"`).FindStringSubmatch(resp); len(m) > 1 {
+		return m[1], nil
+	}
+	return "", errors.New("not found")
+}
+
+// GetPhoneNumber 查询电话号码。
+func (s *SerialService) GetPhoneNumber() (string, error) {
+	resp, err := s.SendATCommand("AT+CNUM")
+	if err != nil {
+		return "", err
+	}
+
+	if m := regexp.MustCompile(`\+CNUM:.*,"([^"]+)"`).FindStringSubmatch(resp); len(m) > 1 {
+		return DecodeUCS2Hex(m[1]), nil
+	}
+	return "", errors.New("not found")
+}
+
 // GetSignalStrength 查询信号强度。
 func (s *SerialService) GetSignalStrength() (*SignalStrength, error) {
-	resp, err := s.SendATCommand(cmdSignal)
+	resp, err := s.SendATCommand("AT+CSQ")
 	if err != nil {
 		return nil, err
 	}
 
-	var rssi, qual int
+	var rssi, qual int = -1, -1
 	if _, err := fmt.Sscanf(extractValue(resp), "+CSQ: %d,%d", &rssi, &qual); err != nil {
 		return nil, err
+	}
+
+	dbm := "unknown"
+	if rssi >= 0 && rssi <= 31 {
+		dbm = fmt.Sprintf("%d dBm", -113+rssi*2)
 	}
 
 	return &SignalStrength{
 		RSSI:    rssi,
 		Quality: qual,
-		DBM:     fmt.Sprintf("%d dBm", -113+rssi*2),
+		DBM:     dbm,
 	}, nil
 }
 
 // ListSMS 获取短信列表。
 func (s *SerialService) ListSMS() ([]SMS, error) {
-	resp, err := s.SendATCommand(cmdListSMS)
+	resp, err := s.SendATCommand("AT+CMGL=4")
 	if err != nil {
 		return nil, err
 	}
@@ -242,12 +230,26 @@ func (s *SerialService) ListSMS() ([]SMS, error) {
 
 		idx, _ := strconv.Atoi(strings.TrimSpace(fields[0]))
 		stat, _ := strconv.Atoi(strings.TrimSpace(fields[1]))
-		pdu := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(lines[1]), respOK))
+		pduHex := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(lines[1]), "OK"))
 
-		sender, timestamp, message, ref, total, seq, err := decodePDU(pdu)
-		if err != nil {
-			// 如果解析失败，保留原始 PDU 以便调试
-			message = "PDU Decode Error: " + err.Error() + " Raw: " + pdu
+		var sender, timestamp, message string
+		ref, total, seq := 0, 1, 1
+		if raw, decErr := hex.DecodeString(pduHex); decErr == nil {
+			var msg sms.Message
+			if _, rdErr := msg.ReadFrom(raw); rdErr == nil {
+				sender = string(msg.Address)
+				timestamp = time.Time(msg.ServiceCenterTime).Format("2006/01/02 15:04:05")
+				message = msg.Text
+				if msg.UserDataHeader.TotalNumber > 0 && msg.UserDataHeader.Sequence > 0 {
+					total = msg.UserDataHeader.TotalNumber
+					seq = msg.UserDataHeader.Sequence
+					ref = msg.UserDataHeader.Tag
+				}
+			} else {
+				message = "PDU Decode Error: " + rdErr.Error() + " Raw: " + pduHex
+			}
+		} else {
+			message = "PDU Hex Decode Error: " + decErr.Error() + " Raw: " + pduHex
 		}
 
 		parts = append(parts, struct {
@@ -307,21 +309,35 @@ func (s *SerialService) ListSMS() ([]SMS, error) {
 
 // SendSMS 发送短信。
 func (s *SerialService) SendSMS(number, message string) error {
-	pdu, length, err := encodePDU(number, message)
+	msg := sms.Message{
+		Type:    sms.MessageTypes.Submit,
+		Address: sms.PhoneNumber(number),
+		Text:    message,
+	}
+	if pdu.Is7BitEncodable(message) {
+		msg.Encoding = sms.Encodings.Gsm7Bit
+	} else {
+		msg.Encoding = sms.Encodings.UCS2
+	}
+
+	length, octets, err := msg.PDU()
 	if err != nil {
 		return err
 	}
 
-	if _, err := s.SendATCommand(fmt.Sprintf(cmdSendSMS, length)); err != nil {
+	_, err = s.SendATCommand(fmt.Sprintf("AT+CMGS=%d", length))
+	if err != nil {
 		return err
 	}
-	_, err = s.sendRawCommand(pdu, ctrlZ, 60*time.Second)
+
+	pduHex := strings.ToUpper(hex.EncodeToString(octets))
+	_, err = s.sendRawCommand(pduHex, "\x1A", 60*time.Second)
 	return err
 }
 
 // DeleteSMS 删除指定索引的短信。
 func (s *SerialService) DeleteSMS(index int) error {
-	_, err := s.SendATCommand(fmt.Sprintf(cmdDeleteSMS, index))
+	_, err := s.SendATCommand(fmt.Sprintf("AT+CMGD=%d", index))
 	return err
 }
 
@@ -330,11 +346,24 @@ func (s *SerialService) DeleteSMS(index int) error {
 func extractValue(response string) string {
 	for _, line := range strings.Split(response, "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" && line != respOK && !strings.HasPrefix(line, cmdCheck) {
+		if line != "" && line != "OK" && !strings.HasPrefix(line, "AT") {
 			return line
 		}
 	}
 	return ""
+}
+
+func DecodeUCS2Hex(s string) string {
+	b, err := hex.DecodeString(strings.TrimSpace(s))
+	if err != nil {
+		return s
+	}
+
+	decoded, err := pdu.DecodeUcs2(b, false)
+	if err != nil {
+		return s
+	}
+	return decoded
 }
 
 func getPDUStatus(stat int) string {
