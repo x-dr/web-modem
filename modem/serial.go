@@ -2,9 +2,8 @@ package modem
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"regexp"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,28 +12,6 @@ import (
 	"unicode/utf16"
 
 	"github.com/tarm/serial"
-)
-
-const (
-	// AT 命令
-	cmdEchoOff      = "ATE0"
-	cmdTextMode     = "AT+CMGF=1"
-	cmdCheck        = "AT"
-	cmdListSMS      = "AT+CMGL=\"ALL\""
-	cmdDeleteSMS    = "AT+CMGD=%d"
-	cmdSendSMS      = "AT+CMGS=\"%s\""
-	cmdSignal       = "AT+CSQ"
-	cmdManufacturer = "AT+CGMI"
-	cmdModel        = "AT+CGMM"
-	cmdIMEI         = "AT+CGSN"
-	cmdIMSI         = "AT+CIMI"
-	cmdOperator     = "AT+COPS?"
-	cmdNumber       = "AT+CNUM"
-
-	// 超时和延迟
-	readTimeout     = 100 * time.Millisecond
-	errorSleep      = 100 * time.Millisecond
-	bufferSize      = 128
 )
 
 // SerialService 封装了单个串口的读取、写入和监控。
@@ -68,7 +45,7 @@ func (s *SerialService) check() error {
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(resp, "OK") {
+	if !strings.Contains(resp, respOK) {
 		return fmt.Errorf("command AT failed: %s", resp)
 	}
 	return nil
@@ -101,11 +78,11 @@ func (s *SerialService) readLoop() {
 
 // SendATCommand 发送 AT 命令并读取响应。
 func (s *SerialService) SendATCommand(command string) (string, error) {
-	return s.sendRawCommand(command, "\r\n")
+	return s.sendRawCommand(command, eof, 1*time.Second)
 }
 
 // sendRawCommand 发送原始命令并读取响应。
-func (s *SerialService) sendRawCommand(command, suffix string) (string, error) {
+func (s *SerialService) sendRawCommand(command, suffix string, timeout time.Duration) (string, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -117,17 +94,28 @@ func (s *SerialService) sendRawCommand(command, suffix string) (string, error) {
 	var resp strings.Builder
 	buf := make([]byte, bufferSize)
 
+	start := time.Now()
 	for {
+		if time.Since(start) > timeout {
+			return "", errTimeout
+		}
+
 		n, err := s.port.Read(buf)
 		if n > 0 {
 			resp.Write(buf[:n])
 			str := resp.String()
-			if strings.Contains(str, "OK") || strings.Contains(str, "ERROR") || strings.Contains(str, ">") {
-				return str, nil
+			if strings.Contains(str, respOK) || strings.Contains(str, respError) || strings.Contains(str, ">") {
+				return strings.TrimSpace(str), nil
 			}
 		}
 		if err != nil {
-			if resp.Len() > 0 { return resp.String(), nil }
+			if err == io.EOF {
+				time.Sleep(errorSleep)
+				continue
+			}
+			if resp.Len() > 0 {
+				return resp.String(), nil
+			}
 			return "", err
 		}
 	}
@@ -163,10 +151,10 @@ func (s *SerialService) GetPhoneNumber() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if m := regexp.MustCompile(`\+CNUM:.*,"([^"]+)"`).FindStringSubmatch(resp); len(m) > 1 {
+	if m := rePhoneNumber.FindStringSubmatch(resp); len(m) > 1 {
 		return m[1], nil
 	}
-	return "", errors.New("not found")
+	return "", errNotFound
 }
 
 // GetSignalStrength 查询信号强度。
@@ -197,9 +185,9 @@ func (s *SerialService) ListSMS() ([]SMS, error) {
 
 	var parts []struct { SMS; ref, total, seq int }
 
-	// 按 +CMGL: 分割以处理多条消息
+	// 按 +CMGL: 分割以处理多条消息，跳过第一个空部分
 	chunks := strings.Split(resp, "+CMGL: ")
-	for _, chunk := range chunks[1:] { // 跳过第一个空部分
+	for _, chunk := range chunks[1:] {
 		lines := strings.SplitN(chunk, "\n", 2)
 		if len(lines) < 2 { continue }
 
@@ -208,8 +196,7 @@ func (s *SerialService) ListSMS() ([]SMS, error) {
 		if len(fields) < 5 { continue }
 
 		idx, _ := strconv.Atoi(strings.TrimSpace(fields[0]))
-
-		content := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(lines[1]), "OK"))
+		content := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(lines[1]), respOK))
 		txt, ref, tot, seq := decodeHexSMS(content)
 
 		parts = append(parts, struct{ SMS; ref, total, seq int }{
@@ -225,8 +212,8 @@ func (s *SerialService) ListSMS() ([]SMS, error) {
 	}
 
 	// 合并长短信
-	merged := make(map[string][]struct{ seq int; msg string })
 	var result []SMS
+	merged := make(map[string][]struct{ seq int; msg string })
 
 	for _, p := range parts {
 		if p.total <= 1 {
@@ -261,7 +248,8 @@ func (s *SerialService) SendSMS(number, message string) error {
 	if _, err := s.SendATCommand(fmt.Sprintf(cmdSendSMS, number)); err != nil {
 		return err
 	}
-	_, err := s.sendRawCommand(message, "\x1A") // \x1A 是 Ctrl+Z
+	encodedMessage := encodeUCS2(message)
+	_, err := s.sendRawCommand(encodedMessage, ctrlZ, 60*time.Second)
 	return err
 }
 
@@ -276,7 +264,7 @@ func (s *SerialService) DeleteSMS(index int) error {
 func extractValue(response string) string {
 	for _, line := range strings.Split(response, "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" && line != "OK" && !strings.HasPrefix(line, "AT") {
+		if line != "" && line != respOK && !strings.HasPrefix(line, cmdCheck) {
 			return line
 		}
 	}
@@ -284,7 +272,7 @@ func extractValue(response string) string {
 }
 
 func extractOperator(response string) string {
-	if m := regexp.MustCompile(`"([^"]+)"`).FindStringSubmatch(response); len(m) > 1 {
+	if m := reOperator.FindStringSubmatch(response); len(m) > 1 {
 		return m[1]
 	}
 	return ""
@@ -293,7 +281,9 @@ func extractOperator(response string) string {
 func decodeHexSMS(content string) (string, int, int, int) {
 	content = strings.TrimSpace(content)
 	b, err := hex.DecodeString(content)
-	if err != nil || len(content)%2 != 0 { return content, 0, 1, 1 }
+	if err != nil || len(content)%2 != 0 {
+		return content, 0, 1, 1
+	}
 
 	offset, ref, total, seq := 0, 0, 1, 1
 
@@ -306,12 +296,33 @@ func decodeHexSMS(content string) (string, int, int, int) {
 		offset, ref, total, seq = 7, int(b[3])<<8|int(b[4]), int(b[5]), int(b[6])
 	}
 
-	if (len(b)-offset)%2 != 0 { return content, 0, 1, 1 }
-
-	// 解码 UTF-16BE
-	u16 := make([]uint16, (len(b)-offset)/2)
-	for i := range u16 {
-		u16[i] = uint16(b[offset+i*2])<<8 | uint16(b[offset+i*2+1])
+	if (len(b)-offset)%2 != 0 {
+		return content, 0, 1, 1
 	}
-	return string(utf16.Decode(u16)), ref, total, seq
+
+	// 将剩余字节重新编码为 Hex ，使用 decodeUCS2Hex 解码
+	remainingHex := hex.EncodeToString(b[offset:])
+	return decodeUCS2Hex(remainingHex), ref, total, seq
+}
+
+func encodeUCS2(s string) string {
+	u16 := utf16.Encode([]rune(s))
+	var sb strings.Builder
+	for _, r := range u16 {
+		sb.WriteString(fmt.Sprintf("%04X", r))
+	}
+	return sb.String()
+}
+
+func decodeUCS2Hex(s string) string {
+	s = strings.TrimSpace(s)
+	b, err := hex.DecodeString(s)
+	if err != nil || len(b)%2 != 0 {
+		return s
+	}
+	u16 := make([]uint16, len(b)/2)
+	for i := range u16 {
+		u16[i] = uint16(b[i*2])<<8 | uint16(b[i*2+1])
+	}
+	return string(utf16.Decode(u16))
 }

@@ -126,7 +126,7 @@ class ModemManager {
         const port = this.getSelectedPort();
         if (!port) return;
         try {
-            this.logger('正在读取短信列表（PDU 模式）...');
+            this.logger('正在读取短信列表 ...');
             const smsList = await this.apiRequest(`/modem/sms/list?port=${encodeURIComponent(port)}`);
             this.displaySMSList(smsList);
             this.logger(`已读取 ${smsList.length} 条短信`);
@@ -145,7 +145,7 @@ class ModemManager {
             return;
         }
         try {
-            this.logger('正在发送短信（支持中文和长短信）...');
+            this.logger('正在发送短信 ...');
             await this.apiRequest('/modem/sms/send', 'POST', { port, number, message });
             this.logger('短信发送成功！', 'success');
             $('#smsNumber').value = '';
