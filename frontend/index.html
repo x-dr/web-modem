@@ -12,7 +12,7 @@
     <div class="container">
         <header>
             <h1>📱 Modem 管理</h1>
-            <select id="portSelect">
+            <select id="portSelect" onchange="app.loadPortRelatedInfo()">
                 <option value="">-- 选择串口 --</option>
             </select>
             <button id="refreshBtn" onclick="app.refreshPorts()">刷新</button>

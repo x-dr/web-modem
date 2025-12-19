@@ -13,8 +13,8 @@ class ModemManager {
     init() {
         this.createTemplate();
         this.setupWebSocket();
-        this.refreshPorts();
         this.setupSMSCounter();
+        this.refreshPorts();
     }
 
     // ---------- API 接口 ----------
@@ -76,20 +76,37 @@ class ModemManager {
                 const connected = ports.find(p => p.connected);
                 if (connected) select.value = connected.path;
             }
+            // 端口刷新后自动加载一次相关信息
+            this.loadPortRelatedInfo();
             this.logger('已刷新串口列表');
         } catch (error) {
             console.error('刷新串口失败:', error);
         }
     }
 
+    async loadPortRelatedInfo() {
+        const port = this.getSelectedPort();
+        if (!port) return;
+
+        try {
+            await this.getSignalStrength(port);
+            await this.getModemInfo(port);
+            await this.listSMS(port);
+        } catch (error) {
+            this.logger('串口相关信息加载失败', 'error');
+        }
+    }
+
     async sendATCommand() {
         const port = this.getSelectedPort();
         if (!port) return;
+
         const command = $('#atCommand').value.trim();
         if (!command) {
             this.logger('请输入 AT 命令', 'error');
             return;
         }
+
         try {
             const result = await this.apiRequest('/modem/at', 'POST', { port, command });
             this.addToTerminal(`> ${command}`);
@@ -100,50 +117,34 @@ class ModemManager {
         }
     }
 
-    async getModemInfo() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-        try {
-            const info = await this.apiRequest(`/modem/info?port=${encodeURIComponent(port)}`);
-            this.displayModemInfo(info);
-        } catch (error) {
-            console.error('获取信息失败:', error);
-        }
+    async getModemInfo(port) {
+        const info = await this.apiRequest(`/modem/info?port=${encodeURIComponent(port)}`);
+        this.displayModemInfo(info);
     }
 
-    async getSignalStrength() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-        try {
-            const signal = await this.apiRequest(`/modem/signal?port=${encodeURIComponent(port)}`);
-            this.displaySignalInfo(signal);
-        } catch (error) {
-            console.error('获取信号强度失败:', error);
-        }
+    async getSignalStrength(port) {
+        const signal = await this.apiRequest(`/modem/signal?port=${encodeURIComponent(port)}`);
+        this.displaySignalInfo(signal);
     }
 
-    async listSMS() {
-        const port = this.getSelectedPort();
-        if (!port) return;
-        try {
-            this.logger('正在读取短信列表 ...');
-            const smsList = await this.apiRequest(`/modem/sms/list?port=${encodeURIComponent(port)}`);
-            this.displaySMSList(smsList);
-            this.logger(`已读取 ${smsList.length} 条短信`);
-        } catch (error) {
-            console.error('获取短信列表失败:', error);
-        }
+    async listSMS(port) {
+        this.logger('正在读取短信列表 ...');
+        const smsList = await this.apiRequest(`/modem/sms/list?port=${encodeURIComponent(port)}`);
+        this.displaySMSList(smsList);
+        this.logger(`已读取 ${smsList.length} 条短信`);
     }
 
     async sendSMS() {
         const port = this.getSelectedPort();
         if (!port) return;
+
         const number = $('#smsNumber').value.trim();
         const message = $('#smsMessage').value.trim();
         if (!number || !message) {
             this.logger('请输入号码和短信内容', 'error');
             return;
         }
+
         try {
             this.logger('正在发送短信 ...');
             await this.apiRequest('/modem/sms/send', 'POST', { port, number, message });
@@ -253,9 +254,12 @@ class ModemManager {
     // ---------- 渲染 ----------
 
     createTemplate() {
-        this.templates.modemInfo = $('#modemInfo')?.innerHTML || '';
-        this.templates.signalInfo = $('#signalInfo')?.innerHTML || '';
-        this.templates.smsItem = $('#smsList')?.innerHTML || '';
+        this.templates.modemInfo = $('#modemInfo').innerHTML || '';
+        $('#modemInfo').innerHTML = '';
+        this.templates.signalInfo = $('#signalInfo').innerHTML || '';
+        $('#signalInfo').innerHTML = '';
+        this.templates.smsItem = $('#smsList').innerHTML || '';
+        $('#smsList').innerHTML = '';
     }
 
     renderTemplate(id, data) {
@@ -283,9 +287,6 @@ class ModemManager {
     }
 }
 
+// ---------- 初始化 ----------
+
 const app = new ModemManager();
-$('#atCommand')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        app.sendATCommand();
-    }
-});
