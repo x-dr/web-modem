@@ -1,12 +1,10 @@
 name: Build and Release
 
 on:
-  push:
-    branches: [ main, master ]
-    tags:
-      - 'v*'
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag version you want to build"
 
 jobs:
   build:
@@ -68,8 +66,9 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ github.ref_name }}-${{ github.sha }}
-        name: Build ${{ github.sha }}
+        body_path: ./RELEASE.md
+        # tag_name: ${{ github.ref_name }}-${{ github.sha }}
+        name: ${{ github.event.inputs.tag }}
         files: ./artifacts/*/*
         draft: false
         prerelease: true
