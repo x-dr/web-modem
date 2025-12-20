@@ -23,3 +23,23 @@ $:
             - echo "Hello, CNB!"
             - echo "This is a sample development environment."
             - npm -v
+
+main:
+  push:
+    - services:
+        - docker
+      stages:
+        - name: 导入密钥
+          imports:
+            - https://cnb.cool/tryxd/secret/-/blob/main/env.yml
+          script: |
+            docker run --rm \
+              -e PLUGIN_TARGET_URL="https://github.com/x-dr/web-modem.git" \
+              -e PLUGIN_AUTH_TYPE="https" \
+              -e PLUGIN_USERNAME=${GIT_USERNAME} \
+              -e PLUGIN_PASSWORD=${GIT_ACCESS_ACTION_TOKEN} \
+              -e PLUGIN_BRANCH="main" \
+              -e PLUGIN_FORCE="true" \
+              -v $(pwd):$(pwd) \
+              -w $(pwd) \
+              tencentcom/git-sync
