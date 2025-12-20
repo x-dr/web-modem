@@ -66,7 +66,7 @@ jobs:
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
-        body_path: ./RELEASE.md
+        # body_path: ./RELEASE.md
         tag_name: ${{ github.event.inputs.tag || github.ref_name }}
         name: ${{ github.event.inputs.tag || github.ref_name }}
         files: ./artifacts/*/*
