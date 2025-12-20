@@ -35,11 +35,12 @@ jobs:
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0
       run: |
         if [ "$GOOS" = "windows" ]; then
-          go build -v -o web-modem-${{ matrix.goos }}-${{ matrix.goarch }}.exe
+          go build -v -ldflags="-s -w" -o web-modem-${{ matrix.goos }}-${{ matrix.goarch }}.exe
         else
-          go build -v -o web-modem-${{ matrix.goos }}-${{ matrix.goarch }}
+          go build -v -ldflags="-s -w" -o web-modem-${{ matrix.goos }}-${{ matrix.goarch }}
         fi
 
     - name: Upload artifacts
