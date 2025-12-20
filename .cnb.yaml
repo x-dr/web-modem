@@ -1,3 +1,4 @@
+# .cnb.yml
 $:
   vscode:
     - docker:
@@ -21,3 +22,4 @@ $:
           script:
             - echo "Hello, CNB!"
             - echo "This is a sample development environment."
+            - npm -v
