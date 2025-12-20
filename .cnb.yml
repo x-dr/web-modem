@@ -24,7 +24,7 @@ $:
             - echo "This is a sample development environment."
             - npm -v
 
-main:
+master:
   push:
     - services:
         - docker
