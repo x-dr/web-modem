@@ -38,7 +38,7 @@ master:
               -e PLUGIN_AUTH_TYPE="https" \
               -e PLUGIN_USERNAME=${GIT_USERNAME} \
               -e PLUGIN_PASSWORD=${GIT_ACCESS_ACTION_TOKEN} \
-              -e PLUGIN_BRANCH="main" \
+              -e PLUGIN_BRANCH="master" \
               -e PLUGIN_FORCE="true" \
               -v $(pwd):$(pwd) \
               -w $(pwd) \
