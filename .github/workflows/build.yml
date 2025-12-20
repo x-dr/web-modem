@@ -59,6 +59,9 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         path: ./artifacts
+    - name: zip frontend
+      run:  |
+        zip -r ./artifacts/frontend.zip ./frontend
 
     - name: Display structure of downloaded files
       run: ls -R ./artifacts
