@@ -67,8 +67,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         body_path: ./RELEASE.md
-        # tag_name: ${{ github.ref_name }}-${{ github.sha }}
-        name: ${{ github.event.inputs.tag }}
+        tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+        name: ${{ github.event.inputs.tag || github.ref_name }}
         files: ./artifacts/*/*
         draft: false
         prerelease: true
