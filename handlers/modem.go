@@ -138,29 +138,6 @@ func GetSignalStrength(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ListSMS 获取调制解调器中的所有短信
-func ListSMS(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		respondJSON(w, http.StatusBadRequest, H{"error": "name is empty"})
-		return
-	}
-
-	conn, err := serialManager.GetConnect(name)
-	if conn == nil {
-		respondJSON(w, http.StatusBadRequest, H{"error": err.Error()})
-		return
-	}
-
-	smsList, err := conn.ListSMSPdu(4)
-	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, H{"error": err.Error()})
-		return
-	}
-
-	respondJSON(w, http.StatusOK, smsList)
-}
-
 // SendSMS 发送短信
 func SendSMS(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -186,11 +163,34 @@ func SendSMS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ListSMS 获取调制解调器中的所有短信
+func ListSMS(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		respondJSON(w, http.StatusBadRequest, H{"error": "name is empty"})
+		return
+	}
+
+	conn, err := serialManager.GetConnect(name)
+	if conn == nil {
+		respondJSON(w, http.StatusBadRequest, H{"error": err.Error()})
+		return
+	}
+
+	smsList, err := conn.ListSMSPdu(4)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, H{"error": err.Error()})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, smsList)
+}
+
 // DeleteSMS 删除短信
 func DeleteSMS(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Name  string `json:"name"`
-		Index int    `json:"index"`
+		Name    string `json:"name"`
+		Indices []int  `json:"indices"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondJSON(w, http.StatusBadRequest, H{"error": err.Error()})
@@ -203,10 +203,10 @@ func DeleteSMS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := conn.DeleteSMS(req.Index); err != nil {
+	if err := conn.DeleteSMS(req.Indices); err != nil {
 		respondJSON(w, http.StatusInternalServerError, H{"error": err.Error()})
 	} else {
-		respondJSON(w, http.StatusOK, H{"status": "deleted"})
+		respondJSON(w, http.StatusOK, H{"status": "deleted", "count": len(req.Indices)})
 	}
 }
 

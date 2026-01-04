@@ -109,7 +109,7 @@ class ModemManager {
         }
 
         try {
-            const result = await this.apiRequest('/modem/at', 'POST', { name: this.name, command: cmd});
+            const result = await this.apiRequest('/modem/at', 'POST', { name: this.name, command: cmd });
             this.addToTerminal(`> ${cmd}`);
             this.addToTerminal(result.response || '');
             $('#atCommand').value = '';
@@ -155,14 +155,14 @@ class ModemManager {
         }
     }
 
-    async deleteSMS(index) {
+    async deleteSMS(indices) {
         if (!confirm('确定要删除这条短信吗？')) {
             return;
         }
 
         try {
-            this.logger(`正在删除短信 (Index: ${index})...`);
-            await this.apiRequest('/modem/sms/delete', 'POST', { name: this.name, index });
+            this.logger(`正在删除短信 (Index: ${indices})...`);
+            await this.apiRequest('/modem/sms/delete', 'POST', { name: this.name, indices });
             this.logger('短信删除成功！', 'success');
             this.listSMS(); // 刷新列表
         } catch (error) {
@@ -255,6 +255,9 @@ class ModemManager {
         return template.replace(/\{([\w.]+)\}/g, (_, path) => {
             const value = path.split('.').reduce((obj, k) => (obj && obj[k] !== undefined ? obj[k] : undefined), data);
             const safe = value === undefined || value === null || value === '' ? '-' : value;
+            if (typeof safe === 'object') {
+                return JSON.stringify(safe);
+            }
             return this.escapeHtml(String(safe));
         });
     }
