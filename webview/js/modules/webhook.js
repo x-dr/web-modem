@@ -376,22 +376,21 @@ export class WebhookManager {
 
     async testWebhook(id = null) {
         try {
-            let testWebhook;
-
             if (id) {
                 // 测试已存在的webhook
                 const queryString = buildQueryString({ id });
                 await apiRequest(`/webhook/test?${queryString}`, 'POST');
             } else {
                 // 测试表单中的webhook
-                const url = $('#webhookURL').value.trim();
+                const url = $('#webhookURL').value.trim()
+                const name = $('#webhookName').value.trim() || '测试';
+                const template = $('#webhookTemplate').value.trim() || '{}';
+
+                // 验证webhook地址
                 if (!url) {
                     app.logger.error('请先填写 URL');
                     return;
                 }
-
-                const name = $('#webhookName').value.trim() || '测试';
-                const template = $('#webhookTemplate').value.trim() || '{}';
 
                 // 验证模板是否为有效的JSON
                 if (template !== '{}') {
@@ -403,14 +402,12 @@ export class WebhookManager {
                     }
                 }
 
-                testWebhook = {
+                await apiRequest('/webhook/test', 'POST', {
                     name: name,
                     url: url,
                     template: template,
                     enabled: true
-                };
-
-                await apiRequest('/webhook/test', 'POST', testWebhook);
+                });
             }
 
             app.logger.success('Webhook 测试请求已发送');
