@@ -17,14 +17,6 @@ export class WebhookManager {
      */
     constructor() {
         this.currentWebhookId = null;  // 当前编辑的 Webhook ID
-        this.setupEventListeners();
-    }
-
-    /**
-     * 设置事件监听器
-     * 绑定Webhook相关的UI事件
-     */
-    setupEventListeners() {
         // Webhook 相关事件
         $('#refreshWebhooksBtn')?.addEventListener('click', () => this.listWebhooks());
         $('#saveWebhookBtn')?.addEventListener('click', () => this.saveWebhook());
@@ -48,7 +40,7 @@ export class WebhookManager {
                 enabledCheckbox.checked = settings.webhook_enabled === 'true' || settings.webhook_enabled === true;
             }
         } catch (error) {
-            console.error('加载Webhook设置失败:', error);
+            console.error('加载 Webhook 设置失败:', error);
         }
     }
 
@@ -63,7 +55,7 @@ export class WebhookManager {
 
             const enabled = enabledCheckbox.checked;
             await apiRequest('/webhook/settings', 'PUT', { webhook_enabled: enabled });
-            app.logger.success(`Webhook功能已${enabled ? '启用' : '禁用'}`);
+            app.logger.success(`Webhook 功能已${enabled ? '启用' : '禁用'}`);
         } catch (error) {
             app.logger.error('更新设置失败');
         }
@@ -78,7 +70,7 @@ export class WebhookManager {
             const webhooks = await apiRequest('/webhook/list');
             this.displayWebhookList(webhooks);
         } catch (error) {
-            console.error('加载Webhook列表失败:', error);
+            console.error('加载 Webhook 列表失败:', error);
         }
     }
 
@@ -89,31 +81,17 @@ export class WebhookManager {
      */
     displayWebhookList(webhooks) {
         const tbody = $('#webhookTableBody');
-        if (!tbody) return;
-
-        tbody.innerHTML = '';
-
         if (!webhooks || webhooks.length === 0) {
             tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">暂无 Webhook 配置</td></tr>';
             return;
         }
-
-        const fragment = document.createDocumentFragment();
-        webhooks.forEach(webhook => {
-            const rowHtml = app.render.render('webhookItem', {
-                id: webhook.id,
-                name: webhook.name,
-                url: webhook.url,
-                enabled: webhook.enabled ? '✅ 启用' : '❌ 禁用',
-                created_at: new Date(webhook.created_at).toLocaleString()
-            });
-            const tempDiv = document.createElement('tbody');
-            tempDiv.innerHTML = rowHtml;
-            while (tempDiv.firstChild) {
-                fragment.appendChild(tempDiv.firstChild);
-            }
-        });
-        tbody.appendChild(fragment);
+        tbody.innerHTML = webhooks.map(webhook => app.render.render('webhookItem', {
+            id: webhook.id,
+            name: webhook.name,
+            url: webhook.url,
+            enabled: webhook.enabled ? '✅ 启用' : '❌ 禁用',
+            created_at: new Date(webhook.created_at).toLocaleString()
+        })).join('');
     }
 
     async editWebhook(id) {
@@ -127,7 +105,7 @@ export class WebhookManager {
             $('#webhookTemplate').value = webhook.template;
             $('#webhookEnabledCheckbox').checked = webhook.enabled;
         } catch (error) {
-            console.error('加载Webhook详情失败:', error);
+            console.error('加载 Webhook 详情失败:', error);
         }
     }
 
@@ -147,7 +125,7 @@ export class WebhookManager {
         const enabled = $('#webhookEnabledCheckbox').checked;
 
         if (!name || !url) {
-            alert('请填写名称和URL');
+            alert('请填写名称和 URL');
             return;
         }
 
@@ -156,7 +134,7 @@ export class WebhookManager {
             try {
                 JSON.parse(template);
             } catch (e) {
-                alert('模板必须是有效的JSON格式');
+                alert('模板必须是有效的 JSON 格式');
                 return;
             }
         }
@@ -165,42 +143,40 @@ export class WebhookManager {
             const webhookData = { name, url, template, enabled };
 
             if (this.currentWebhookId) {
-                // 更新
                 const queryString = buildQueryString({ id: this.currentWebhookId });
                 await apiRequest(`/webhook/update?${queryString}`, 'PUT', webhookData);
-                app.logger.success('Webhook更新成功');
+                app.logger.success('Webhook 更新成功');
             } else {
-                // 创建
                 await apiRequest('/webhook', 'POST', webhookData);
-                app.logger.success('Webhook创建成功');
+                app.logger.success('Webhook 创建成功');
             }
 
             this.resetForm();
             this.listWebhooks();
         } catch (error) {
-            app.logger.error('保存Webhook失败: ' + error);
+            app.logger.error('保存 Webhook 失败: ' + error);
         }
     }
 
     async deleteWebhook(id) {
-        if (!confirm('确定要删除这个Webhook吗？')) {
+        if (!confirm('确定要删除这个 Webhook 吗？')) {
             return;
         }
 
         try {
             const queryString = buildQueryString({ id });
             await apiRequest(`/webhook/delete?${queryString}`, 'DELETE');
-            app.logger.success('Webhook删除成功');
+            app.logger.success('Webhook 删除成功');
             this.listWebhooks();
         } catch (error) {
-            app.logger.error('删除Webhook失败: ' + error);
+            app.logger.error('删除 Webhook 失败: ' + error);
         }
     }
 
     async testWebhook() {
         const url = $('#webhookURL').value.trim();
         if (!url) {
-            alert('请先填写URL');
+            alert('请先填写 URL');
             return;
         }
 
@@ -213,7 +189,7 @@ export class WebhookManager {
                 JSON.parse(template);
             }
         } catch (e) {
-            alert('模板必须是有效的JSON格式');
+            alert('模板必须是有效的 JSON 格式');
             return;
         }
 
@@ -227,9 +203,9 @@ export class WebhookManager {
 
         try {
             await apiRequest('/webhook/test', 'POST', testWebhook);
-            app.logger.success('Webhook测试请求已发送');
+            app.logger.success('Webhook 测试请求已发送');
         } catch (error) {
-            app.logger.error('Webhook测试失败');
+            app.logger.error('Webhook 测试失败');
         }
     }
 
@@ -237,9 +213,9 @@ export class WebhookManager {
         try {
             const queryString = buildQueryString({ id });
             await apiRequest(`/webhook/test?${queryString}`, 'POST');
-            app.logger.success('Webhook测试请求已发送');
+            app.logger.success('Webhook 测试请求已发送');
         } catch (error) {
-            app.logger.error('Webhook测试失败');
+            app.logger.error('Webhook 测试失败');
         }
     }
 }

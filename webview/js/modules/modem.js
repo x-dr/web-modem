@@ -20,14 +20,7 @@ export class ModemManager {
         this.name = null;         // 当前选中的Modem名称
         this.setupSMSCounter();
         this.refreshModems();
-        this.setupEventListeners();
-    }
-
-    /**
-     * 设置事件监听器
-     * 绑定所有Modem相关的UI事件
-     */
-    setupEventListeners() {
+        // 绑定所有Modem相关的UI事件
         $('#modemSelect')?.addEventListener('change', () => this.loadModemRelatedInfo());
         $('#refreshBtn')?.addEventListener('click', () => this.refreshModems());
         $('#getModemInfoBtn')?.addEventListener('click', () => this.getModemInfo());

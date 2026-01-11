@@ -16,13 +16,7 @@ export class Logger {
     constructor() {
         this.isExpanded = true;
         this.container = $('#logContainer');
-        this.setupEventListeners();
-    }
-
-    /**
-     * 设置事件监听器
-     */
-    setupEventListeners() {
+        // 设置事件监听器
         $('#logClearBtn')?.addEventListener('click', () => this.clear());
         $('#logToggleBtn')?.addEventListener('click', () => this.toggle());
     }

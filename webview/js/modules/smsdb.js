@@ -20,14 +20,6 @@ export class SmsdbManager {
         this.pageSize = 50;               // 每页显示数量
         this.total = 0;                   // 总记录数
         this.selectedSmsdb = new Set();   // 选中的短信ID集合
-        this.setupEventListeners();
-    }
-
-    /**
-     * 设置事件监听器
-     * 绑定短信存储相关的UI事件
-     */
-    setupEventListeners() {
         // 短信存储相关事件
         $('#refreshSmsdbBtn')?.addEventListener('click', () => this.listSmsdb());
         $('#deleteSelectedSmsdbBtn')?.addEventListener('click', () => this.deleteSelectedSmsdb());

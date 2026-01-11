@@ -21,14 +21,6 @@ export class TabManager {
         this.smsdbManager = smsdbManager;
         this.webhookManager = webhookManager;
         this.currentTab = 'main';
-        this.setupEventListeners();
-    }
-
-    /**
-     * 设置事件监听器
-     * 绑定导航标签的点击事件
-     */
-    setupEventListeners() {
         // 为所有导航标签绑定点击事件
         $$('.nav-tab').forEach(nav => {
             nav.addEventListener('click', (e) => {
