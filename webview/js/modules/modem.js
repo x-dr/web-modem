@@ -16,7 +16,6 @@ export class ModemManager {
      * 初始化Modem管理器的基本状态和属性
      */
     constructor() {
-        this.isBusy = false;      // 操作繁忙状态标志
         this.name = null;         // 当前选中的Modem名称
         this.setupSMSCounter();
         this.refreshModems();
@@ -45,7 +44,6 @@ export class ModemManager {
             const current = select.value;
             select.innerHTML = '<option value="">-- 选择串口 --</option>';
 
-            // 填充Modem选择框
             modems.forEach(modem => {
                 const option = document.createElement('option');
                 option.value = modem.name;
@@ -53,7 +51,6 @@ export class ModemManager {
                 select.appendChild(option);
             });
 
-            // 优先保持当前选择，否则选第一个已连接
             if (current && modems.find(p => p.name === current && p.connected)) {
                 select.value = current;
             } else {
@@ -61,7 +58,6 @@ export class ModemManager {
                 if (connected) select.value = connected.name;
             }
 
-            // 端口刷新后自动加载一次相关信息
             this.loadModemRelatedInfo();
             app.logger.info('已刷新串口列表');
         } catch (error) {
@@ -244,23 +240,17 @@ export class ModemManager {
         const parts = Math.ceil(message.length / maxChars) || 1;
         const encoding = hasUnicode ? 'UCS2 (中文)' : 'GSM 7-bit';
 
-        // 使用模板渲染计数器内容
-        const counterHtml = app.render.render('smsCounterTemplate', {
-            length: message.length,
-            maxChars: maxChars,
-            parts: parts,
-            encoding: encoding
-        });
-
-        counter.innerHTML = counterHtml;
+        let counterHtml = `<span>字符数: ${message.length} / ${maxChars}</span> | <span>短信条数: ${parts}</span> | <span>编码: ${encoding}</span>`;
 
         if (parts > 3) {
             counter.style.color = '#ff4444';
-            counter.innerHTML += ` <strong>⚠️ 消息过长，将分为 ${parts} 条发送</strong>`;
+            counterHtml += ` <strong>⚠️ 消息过长，将分为 ${parts} 条发送</strong>`;
         } else if (parts > 1) {
             counter.style.color = '#ff9800';
         } else {
             counter.style.color = '#666';
         }
+
+        counter.innerHTML = counterHtml;
     }
 }

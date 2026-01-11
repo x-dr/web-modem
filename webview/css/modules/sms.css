@@ -57,16 +57,7 @@
 /* 短信删除按钮 */
 .sms-header .delete-btn {
     flex-shrink: 0;
-    background: var(--danger);
-    color: white;
-    border: none;
     padding: 0.25rem 0.75rem;
-    border-radius: 4px;
     font-size: 0.8rem;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.sms-header .delete-btn:hover {
-    background: #dc2626;
+    border-radius: 4px;
 }

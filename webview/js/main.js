@@ -31,7 +31,7 @@ async function init() {
         app.render = new UIrender();
         
         // 初始化 WebSocket 服务
-        app.webSocketService = new WebSocketService(app.logger);
+        app.webSocketService = new WebSocketService();
         app.webSocketService.connect(`ws://${location.host}/ws/modem`);
 
         // 初始化各个功能管理器

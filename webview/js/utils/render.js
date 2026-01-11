@@ -19,7 +19,6 @@ export class UIrender {
         this.extractTemplate('modemInfo', 'modemInfo');
         this.extractTemplate('signalInfo', 'signalInfo');
         this.extractTemplate('smsList', 'smsItem');
-        this.extractTemplate('smsCounterTemplate', 'smsCounterTemplate');
         this.extractTemplate('smsdbList', 'smsdbItem');
         this.extractTemplate('webhookItem', 'webhookItem');
     }
@@ -30,10 +29,12 @@ export class UIrender {
      * @param {string} templateKey - 模板键名
      */
     extractTemplate(elementId, templateKey) {
-        const element = $(`#${elementId}`);
-        if (element) {
-            this.templates[templateKey] = element.innerHTML || '';
-            element.innerHTML = '';
+        if (!this.templates[templateKey]) {
+            const element = $(`#${elementId}`);
+            if (element) {
+                this.templates[templateKey] = element.innerHTML || '';
+                element.innerHTML = '';
+            }
         }
     }
 

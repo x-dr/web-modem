@@ -46,7 +46,7 @@ export class SmsdbManager {
                 enabledCheckbox.checked = settings.smsdb_enabled === 'true' || settings.smsdb_enabled === true;
             }
         } catch (error) {
-            console.error('加载短信存储设置失败:', error);
+            app.logger.error('加载短信存储设置失败: ' + error);
         }
     }
 
@@ -108,7 +108,7 @@ export class SmsdbManager {
             this.displaysmsdbBody(result.data);
             this.updateSmsdbPagination();
         } catch (error) {
-            console.error('加载短信存储失败:', error);
+            app.logger.error('加载短信存储失败: ' + error);
         }
     }
 
@@ -172,7 +172,7 @@ export class SmsdbManager {
 
     async deleteSelectedSmsdb() {
         if (this.selectedSmsdb.size === 0) {
-            alert('请先选择要删除的短信');
+            app.logger.error('请先选择要删除的短信');
             return;
         }
 

@@ -9,7 +9,7 @@
  * 负责管理WebSocket连接和事件分发
  */
 export class WebSocketService {
-    
+
     /**
      * 构造函数
      */
@@ -32,7 +32,7 @@ export class WebSocketService {
             this.ws = new WebSocket(url);
             this.setupEventListeners();
         } catch (error) {
-            app.logger.error('WebSocket连接失败: ' + error);
+            console.error('WebSocket连接失败:', error);
             this.scheduleReconnect(url);
         }
     }
@@ -42,7 +42,7 @@ export class WebSocketService {
      */
     setupEventListeners() {
         this.ws.onopen = () => {
-            app.logger.info('WebSocket 已连接');
+            console.log('WebSocket 已连接');
             this.emit('connected');
         };
 
@@ -51,12 +51,12 @@ export class WebSocketService {
         };
 
         this.ws.onerror = (error) => {
-            app.logger.error('WebSocket 错误: ' + error);
+            console.error('WebSocket 错误:', error);
             this.emit('error', error);
         };
 
         this.ws.onclose = () => {
-            app.logger.info('WebSocket 已断开');
+            console.log('WebSocket 已断开');
             this.emit('disconnected');
             this.scheduleReconnect(this.ws.url);
         };

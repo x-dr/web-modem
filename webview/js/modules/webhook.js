@@ -40,7 +40,7 @@ export class WebhookManager {
                 enabledCheckbox.checked = settings.webhook_enabled === 'true' || settings.webhook_enabled === true;
             }
         } catch (error) {
-            console.error('加载 Webhook 设置失败:', error);
+            app.logger.error('加载 Webhook 设置失败: ' + error);
         }
     }
 
@@ -70,7 +70,7 @@ export class WebhookManager {
             const webhooks = await apiRequest('/webhook/list');
             this.displayWebhookList(webhooks);
         } catch (error) {
-            console.error('加载 Webhook 列表失败:', error);
+            app.logger.error('加载 Webhook 列表失败: ' + error);
         }
     }
 
@@ -105,7 +105,7 @@ export class WebhookManager {
             $('#webhookTemplate').value = webhook.template;
             $('#webhookEnabledCheckbox').checked = webhook.enabled;
         } catch (error) {
-            console.error('加载 Webhook 详情失败:', error);
+            app.logger.error('加载 Webhook 详情失败: ' + error);
         }
     }
 
@@ -125,7 +125,7 @@ export class WebhookManager {
         const enabled = $('#webhookEnabledCheckbox').checked;
 
         if (!name || !url) {
-            alert('请填写名称和 URL');
+            app.logger.error('请填写名称和 URL');
             return;
         }
 
@@ -134,7 +134,7 @@ export class WebhookManager {
             try {
                 JSON.parse(template);
             } catch (e) {
-                alert('模板必须是有效的 JSON 格式');
+                app.logger.error('模板必须是有效的 JSON 格式');
                 return;
             }
         }
@@ -173,46 +173,45 @@ export class WebhookManager {
         }
     }
 
-    async testWebhook() {
-        const url = $('#webhookURL').value.trim();
-        if (!url) {
-            alert('请先填写 URL');
-            return;
-        }
-
-        const name = $('#webhookName').value.trim() || '测试';
-        const template = $('#webhookTemplate').value.trim() || '{}';
-
+    async testWebhook(id = null) {
         try {
-            // 如果模板不是有效的JSON，使用默认值
-            if (template !== '{}') {
-                JSON.parse(template);
+            let testWebhook;
+
+            if (id) {
+                // 测试已存在的webhook
+                const queryString = buildQueryString({ id });
+                await apiRequest(`/webhook/test?${queryString}`, 'POST');
+            } else {
+                // 测试表单中的webhook
+                const url = $('#webhookURL').value.trim();
+                if (!url) {
+                    app.logger.error('请先填写 URL');
+                    return;
+                }
+
+                const name = $('#webhookName').value.trim() || '测试';
+                const template = $('#webhookTemplate').value.trim() || '{}';
+
+                // 验证模板是否为有效的JSON
+                if (template !== '{}') {
+                    try {
+                        JSON.parse(template);
+                    } catch (e) {
+                        app.logger.error('模板必须是有效的 JSON 格式');
+                        return;
+                    }
+                }
+
+                testWebhook = {
+                    name: name,
+                    url: url,
+                    template: template,
+                    enabled: true
+                };
+
+                await apiRequest('/webhook/test', 'POST', testWebhook);
             }
-        } catch (e) {
-            alert('模板必须是有效的 JSON 格式');
-            return;
-        }
 
-        // 创建一个临时的webhook对象用于测试
-        const testWebhook = {
-            name: name,
-            url: url,
-            template: template,
-            enabled: true
-        };
-
-        try {
-            await apiRequest('/webhook/test', 'POST', testWebhook);
-            app.logger.success('Webhook 测试请求已发送');
-        } catch (error) {
-            app.logger.error('Webhook 测试失败');
-        }
-    }
-
-    async testExistingWebhook(id) {
-        try {
-            const queryString = buildQueryString({ id });
-            await apiRequest(`/webhook/test?${queryString}`, 'POST');
             app.logger.success('Webhook 测试请求已发送');
         } catch (error) {
             app.logger.error('Webhook 测试失败');

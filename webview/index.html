@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modem 管理系统</title>
-    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 
 <body>
@@ -102,12 +102,12 @@
                     <div class="card-body">
                         <div class="scroll-container" id="smsList">
                             <div class="sms-item">
-                                <div class="sms-header">
-                                    <span class="sms-number">📱 {sms.phoneNumber} &nbsp;</span>
-                                    <span class="sms-time">🕐 {sms.time} &nbsp;</span>
-                                    <span class="flex-auto"></span>
-                                    <button class="delete-btn" onclick="app.modemManager.deleteSMS({sms.indices})">删除</button>
-                                </div>
+                            <div class="sms-header">
+                                <span class="sms-number">📱 {sms.phoneNumber} &nbsp;</span>
+                                <span class="sms-time">🕐 {sms.time} &nbsp;</span>
+                                <span style="flex: auto;"></span>
+                                <button class="delete-btn" onclick="app.modemManager.deleteSMS({sms.indices})">删除</button>
+                            </div>
                                 <div class="sms-message">{sms.text}</div>
                             </div>
                         </div>
@@ -131,11 +131,6 @@
                         </div>
                         <div id="smsCounter"></div>
                     </div>
-                </div>
-
-                <!-- 短信计数器模板 -->
-                <div id="smsCounterTemplate">
-                    <span>字符数: {length} / {maxChars}</span> | <span>短信条数: {parts}</span> | <span>编码: {encoding}</span>
                 </div>
 
                 <!-- AT 命令终端 -->
@@ -190,7 +185,7 @@
 
                         <!-- 短信列表 -->
                         <div class="scroll-container">
-                            <table class="table" id="smsdbBody">
+                            <table class="table smsdb-table" id="smsdbBody">
                                 <thead>
                                     <tr>
                                         <th><input type="checkbox" id="smsdbCheckAll"></th>
@@ -255,7 +250,7 @@
 
                         <!-- Webhook列表 -->
                         <div class="scroll-container">
-                            <table class="table" id="webhookList">
+                            <table class="table webhook-table" id="webhookList">
                                 <thead>
                                     <tr>
                                         <th>ID</th>
@@ -277,7 +272,7 @@
                                         <td>
                                             <button onclick="app.webhookManager.editWebhook({id})">编辑</button>
                                             <button class="delete-btn" onclick="app.webhookManager.deleteWebhook({id})">删除</button>
-                                            <button onclick="app.webhookManager.testExistingWebhook({id})">测试</button>
+                                            <button onclick="app.webhookManager.testWebhook({id})">测试</button>
                                         </td>
                                     </tr>
                                 </tbody>

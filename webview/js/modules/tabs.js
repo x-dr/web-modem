@@ -37,26 +37,14 @@ export class TabManager {
      * @param {string} tabName - 要切换到的标签名称
      */
     switchTab(tabName) {
-        // 隐藏所有标签内容
-        $$('.tab-content').forEach(tab => {
-            tab.classList.remove('active');
-        });
+        // 隐藏所有标签内容和导航标签
+        $$('.tab-content').forEach(tab => tab.classList.remove('active'));
+        $$('.nav-tab').forEach(nav => nav.classList.remove('active'));
 
-        // 隐藏所有导航标签
+        // 显示选中的标签内容和导航标签
+        $(`#${tabName}Tab`)?.classList.add('active');
         $$('.nav-tab').forEach(nav => {
-            nav.classList.remove('active');
-        });
-
-        // 显示选中的标签内容
-        const targetTab = $(`#${tabName}Tab`);
-        if (targetTab) {
-            targetTab.classList.add('active');
-        }
-
-        // 激活对应的导航标签
-        $$('.nav-tab').forEach((nav, index) => {
-            const tabs = ['main', 'smsdb', 'webhook'];
-            if (tabs[index] === tabName) {
+            if (nav.dataset.tab === tabName) {
                 nav.classList.add('active');
             }
         });

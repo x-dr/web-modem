@@ -3,17 +3,9 @@
    ========================================= */
 
 /**
- * 页面整体响应式布局
- * 适用于所有功能模块的通用响应式适配
+ * 通用样式适配
  */
-
-/* 移动端适配 (768px以下) */
 @media (max-width: 768px) {
-    body {
-        padding: 0.5rem;
-    }
-
-    /* 页面布局模块：头部区域 */
     .header {
         flex-direction: column;
         gap: 1rem;
@@ -33,45 +25,24 @@
         padding: 0.5rem;
     }
 
-    .control-group {
-        order: 2;
-        width: 100%;
-        flex-direction: row;
-        flex-wrap: wrap;
-    }
-
-    .select {
-        min-width: auto;
-        width: 100%;
-    }
-
     .filter-section {
         flex-direction: column;
         align-items: stretch;
     }
 
-    /* Modem 模块：信息网格 */
+    .filter-section .form-input,
+    .filter-section .select {
+        width: 100%;
+    }
+
     .info-grid {
         grid-template-columns: 1fr;
-    }
-
-    /* 通用模块：表格 */
-    .table {
-        font-size: 0.75rem;
-    }
-
-    .table th,
-    .table td {
-        padding: 0.5rem;
     }
 }
 
 /**
- * Modem 主界面模块响应式布局
- * 信息网格在不同屏幕尺寸下的显示列数
+ * Modem 信息网格
  */
-
-/* 响应式优化：在中等屏幕下显示2列，大屏幕显示3列 */
 @media (min-width: 768px) {
     .info-grid {
         grid-template-columns: repeat(2, 1fr);
@@ -81,33 +52,5 @@
 @media (min-width: 1024px) {
     .info-grid {
         grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-/**
- * Modem 短信模块响应式布局
- * 短信列表在小屏幕下的优化显示
- */
-
-/* 小屏幕优化 - 保持单行，缩略显示 */
-@media (max-width: 640px) {
-    .sms-number {
-        font-size: 0.8rem;
-        max-width: 100px;
-    }
-
-    .sms-time {
-        font-size: 0.7rem;
-        max-width: 50px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .sms-header .delete-btn {
-        font-size: 0.7rem;
-        padding: 0.2rem 0.5rem;
-        min-width: auto;
-        flex-shrink: 0;
-        margin-left: 0.5rem;
     }
 }
