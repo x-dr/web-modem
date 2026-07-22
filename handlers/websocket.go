@@ -9,12 +9,23 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		return OriginAllowed(r)
+	},
 }
 
 // HandleWebSocket 将 HTTP 连接升级为 WebSocket 连接
 // 并将串口事件流式传输到客户端。
 func HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+	if !AuthenticateRequest(r) {
+		if apiToken() == "" {
+			http.Error(w, "unauthorized: set API_TOKEN or ALLOW_INSECURE_NO_AUTH=true", http.StatusUnauthorized)
+			return
+		}
+		http.Error(w, "unauthorized: provide token query or Authorization header", http.StatusUnauthorized)
+		return
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return

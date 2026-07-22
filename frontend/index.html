@@ -16,6 +16,11 @@
                 <option value="">-- 选择串口 --</option>
             </select>
             <button id="refreshBtn" onclick="app.refreshPorts()">刷新</button>
+            <div class="token-bar" title="与服务端 API_TOKEN 一致；保存在浏览器 localStorage">
+                <label for="apiToken">API Token</label>
+                <input type="password" id="apiToken" placeholder="鉴权令牌" autocomplete="off" />
+                <button type="button" id="saveTokenBtn">保存</button>
+            </div>
         </header>
 
         <main>

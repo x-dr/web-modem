@@ -8,14 +8,50 @@ class ModemManager {
         this.isBusy = false;
         this.templates = {};
         this.port = null;
+        this.apiToken = localStorage.getItem('web_modem_api_token') || '';
         this.init();
     }
 
     init() {
         this.createTemplate();
+        this.setupTokenUI();
         this.setupWebSocket();
         this.setupSMSCounter();
         this.refreshPorts();
+    }
+
+    // ---------- 鉴权 Token ----------
+
+    setupTokenUI() {
+        const input = $('#apiToken');
+        const saveBtn = $('#saveTokenBtn');
+        if (!input) return;
+        input.value = this.apiToken;
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.apiToken = (input.value || '').trim();
+                if (this.apiToken) {
+                    localStorage.setItem('web_modem_api_token', this.apiToken);
+                    this.logger('API Token 已保存到本地', 'success');
+                } else {
+                    localStorage.removeItem('web_modem_api_token');
+                    this.logger('API Token 已清除');
+                }
+                // 重连 WebSocket 以使用新 token
+                if (this.ws) {
+                    try { this.ws.close(); } catch (_) { /* ignore */ }
+                }
+            });
+        }
+    }
+
+    authHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        if (this.apiToken) {
+            headers['Authorization'] = 'Bearer ' + this.apiToken;
+            headers['X-API-Token'] = this.apiToken;
+        }
+        return headers;
     }
 
     // ---------- API 接口 ----------
@@ -27,13 +63,18 @@ class ModemManager {
         }
 
         this.toggleButtons(true);
-        const options = { method, headers: { 'Content-Type': 'application/json' } };
+        const options = { method, headers: this.authHeaders() };
         if (body) options.body = JSON.stringify(body);
         try {
             const response = await fetch('/api/v1' + endpoint, options);
-            const data = await response.json();
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = {};
+            }
             if (!response.ok) {
-                const msg = data.error || '请求失败';
+                const msg = data.error || ('请求失败 (' + response.status + ')');
                 this.logger(msg, 'error');
                 throw new Error(msg);
             }
@@ -46,7 +87,12 @@ class ModemManager {
     // ---------- WebSocket 连接 ----------
 
     setupWebSocket() {
-        this.ws = new WebSocket(`ws://${location.host}/ws`);
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        let url = `${proto}//${location.host}/ws`;
+        if (this.apiToken) {
+            url += `?token=${encodeURIComponent(this.apiToken)}`;
+        }
+        this.ws = new WebSocket(url);
         this.ws.onopen = () => this.logger('WebSocket 已连接');
         this.ws.onmessage = (event) => this.logger(event.data);
         this.ws.onerror = (error) => this.logger('WebSocket 错误: ' + error);
