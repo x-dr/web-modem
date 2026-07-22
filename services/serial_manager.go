@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"web-modem/modem"
@@ -29,24 +30,49 @@ func GetSerialManager() *SerialManager {
 	return managerInstance
 }
 
+// candidatePorts 返回当前平台上可能的串口设备路径。
+// Linux/macOS: /dev/ttyUSB*、/dev/ttyACM*、/dev/tty.usb* 等
+// Windows: COM1–COM32（实际可用性在连接时验证）
+func candidatePorts() []string {
+	switch runtime.GOOS {
+	case "windows":
+		ports := make([]string, 0, 32)
+		for i := 1; i <= 32; i++ {
+			ports = append(ports, fmt.Sprintf("COM%d", i))
+		}
+		return ports
+	default:
+		patterns := []string{
+			"/dev/ttyUSB*",
+			"/dev/ttyACM*",
+			"/dev/tty.usbserial*",
+			"/dev/tty.usbmodem*",
+			"/dev/cu.usbserial*",
+			"/dev/cu.usbmodem*",
+		}
+		var ports []string
+		for _, p := range patterns {
+			if matched, err := filepath.Glob(p); err == nil {
+				ports = append(ports, matched...)
+			}
+		}
+		return ports
+	}
+}
+
 // Scan 扫描可用的调制解调器并连接到它们。
-// 它查找匹配 /dev/ttyUSB* 和 /dev/ttyACM* 的设备。
 func (m *SerialManager) Scan(baudRate int) ([]modem.SerialPort, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// 查找潜在设备
-	usb, _ := filepath.Glob("/dev/ttyUSB*")
-	acm, _ := filepath.Glob("/dev/ttyACM*")
-
-	// 尝试连接到新设备
-	for _, p := range append(usb, acm...) {
-		if _, exists := m.pool[p]; !exists {
-			broadcast := GetEventListener().Broadcast
-			if svc, err := modem.NewSerialService(p, baudRate, broadcast); err == nil {
-				m.pool[p] = svc
-				svc.Start()
-			}
+	for _, p := range candidatePorts() {
+		if _, exists := m.pool[p]; exists {
+			continue
+		}
+		broadcast := GetEventListener().Broadcast
+		if svc, err := modem.NewSerialService(p, baudRate, broadcast); err == nil {
+			m.pool[p] = svc
+			svc.Start()
 		}
 	}
 

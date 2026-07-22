@@ -32,6 +32,7 @@ master:
         - name: 导入密钥
           imports:
             - https://cnb.cool/tryxd/secret/-/blob/main/env.yml
+          # PLUGIN_FORCE=true 会强推覆盖 GitHub 远端历史，仅在确认需要时改为 true
           script: |
             docker run --rm \
               -e PLUGIN_TARGET_URL="https://github.com/x-dr/web-modem.git" \
@@ -39,7 +40,7 @@ master:
               -e PLUGIN_USERNAME=${GIT_USERNAME} \
               -e PLUGIN_PASSWORD=${GIT_ACCESS_ACTION_TOKEN} \
               -e PLUGIN_BRANCH="master" \
-              -e PLUGIN_FORCE="true" \
+              -e PLUGIN_FORCE="false" \
               -v $(pwd):$(pwd) \
               -w $(pwd) \
               tencentcom/git-sync

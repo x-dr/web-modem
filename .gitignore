@@ -1,0 +1,36 @@
+# 编译产物
+web-modem
+web-modem-*
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 前端打包
+frontend.zip
+
+# Go
+/bin/
+/dist/
+*.test
+*.out
+coverage.*
+
+# 环境与密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE / 系统
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 日志与临时
+*.log
+tmp/
+temp/
